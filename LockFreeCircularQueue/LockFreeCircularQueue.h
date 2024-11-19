@@ -8,11 +8,11 @@
 template <typename T, size_t CAPACITY>
 class LockFreeCircularQueue {
 private:
-    alignas(T) char buffer[CAPACITY * sizeof(T)]; // Статическая аллокация памяти
-    std::atomic<size_t> readIndex{ 0 };   // Индекс чтения (атомарный)
-    std::atomic<size_t> writeIndex{ 0 };  // Индекс записи (атомарный)
+    alignas(T) char buffer[CAPACITY * sizeof(T)]; // РЎС‚Р°С‚РёС‡РµСЃРєР°СЏ Р°Р»Р»РѕРєР°С†РёСЏ РїР°РјСЏС‚Рё
+    std::atomic<size_t> readIndex{ 0 };    // РРЅРґРµРєСЃ С‡С‚РµРЅРёСЏ (Р°С‚РѕРјР°СЂРЅС‹Р№)
+    std::atomic<size_t> writeIndex{ 0 };  // РРЅРґРµРєСЃ Р·Р°РїРёСЃРё (Р°С‚РѕРјР°СЂРЅС‹Р№)
 
-     // Возвращает указатель на объект в буфере
+     // Р’РѕР·РІСЂР°С‰Р°РµС‚ СѓРєР°Р·Р°С‚РµР»СЊ РЅР° РѕР±СЉРµРєС‚ РІ Р±СѓС„РµСЂРµ
     T* getBufferSlot(size_t index) noexcept {
         return reinterpret_cast<T*>(&buffer[index * sizeof(T)]);
     }
@@ -20,7 +20,7 @@ private:
 public:
     LockFreeCircularQueue() noexcept = default;
 
-    // Конструктор копирования
+    // РљРѕРЅСЃС‚СЂСѓРєС‚РѕСЂ РєРѕРїРёСЂРѕРІР°РЅРёСЏ
     LockFreeCircularQueue(const LockFreeCircularQueue& other) noexcept {
         size_t read = other.readIndex.load(std::memory_order_acquire);
         size_t write = other.writeIndex.load(std::memory_order_acquire);
@@ -31,11 +31,11 @@ public:
         writeIndex.store(write, std::memory_order_release);
     }
 
-    // Оператор присваивания
+    // РћРїРµСЂР°С‚РѕСЂ РїСЂРёСЃРІР°РёРІР°РЅРёСЏ
     LockFreeCircularQueue& operator=(const LockFreeCircularQueue& other) noexcept {
         if (this == &other) return *this;
 
-        // Уничтожить текущие элементы
+        // РЈРЅРёС‡С‚РѕР¶РёС‚СЊ С‚РµРєСѓС‰РёРµ СЌР»РµРјРµРЅС‚С‹
         clear();
 
         size_t read = other.readIndex.load(std::memory_order_acquire);
@@ -52,42 +52,42 @@ public:
         clear();
     }
 
-    // Добавление элемента в очередь
+    // Р”РѕР±Р°РІР»РµРЅРёРµ СЌР»РµРјРµРЅС‚Р° РІ РѕС‡РµСЂРµРґСЊ
     bool enqueue(const T& item) noexcept {
         size_t currentWrite = writeIndex.load(std::memory_order_relaxed);
         size_t nextWrite = (currentWrite + 1) % CAPACITY;
 
-        // Если очередь полна, пропускаем запись
+        // Р•СЃР»Рё РѕС‡РµСЂРµРґСЊ РїРѕР»РЅР°, РїСЂРѕРїСѓСЃРєР°РµРј Р·Р°РїРёСЃСЊ
         if (nextWrite == readIndex.load(std::memory_order_acquire)) {
             return false;
         }
 
-        // Размещение объекта в буфере
+        // Р Р°Р·РјРµС‰РµРЅРёРµ РѕР±СЉРµРєС‚Р° РІ Р±СѓС„РµСЂРµ
         new (getBufferSlot(currentWrite)) T(item);
         writeIndex.store(nextWrite, std::memory_order_release);
         return true;
     }
 
-    // Извлечение элемента из очереди
+    // РР·РІР»РµС‡РµРЅРёРµ СЌР»РµРјРµРЅС‚Р° РёР· РѕС‡РµСЂРµРґРё
     bool dequeue(T& item) noexcept {
         size_t currentRead = readIndex.load(std::memory_order_relaxed);
 
-        // Если очередь пуста
+        // Р•СЃР»Рё РѕС‡РµСЂРµРґСЊ РїСѓСЃС‚Р°
         if (currentRead == writeIndex.load(std::memory_order_acquire)) {
             return false;
         }
 
-        // Копирование объекта
+        // РљРѕРїРёСЂРѕРІР°РЅРёРµ РѕР±СЉРµРєС‚Р°
         T* slot = getBufferSlot(currentRead);
         item = std::move(*slot);
-        slot->~T(); // Уничтожение объекта
+        slot->~T(); // РЈРЅРёС‡С‚РѕР¶РµРЅРёРµ РѕР±СЉРµРєС‚Р°
 
         readIndex.store((currentRead + 1) % CAPACITY, std::memory_order_release);
 
         return true;
     }
 
-    // Очистка очереди
+    // РћС‡РёСЃС‚РєР° РѕС‡РµСЂРµРґРё
     void clear() noexcept {
         size_t currentRead = readIndex.load(std::memory_order_relaxed);
         size_t currentWrite = writeIndex.load(std::memory_order_relaxed);
